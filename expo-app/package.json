@@ -1,0 +1,16 @@
+{
+  "name": "godrealm-expo",
+  "version": "0.1.0",
+  "private": true,
+  "main": "App.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android"
+  },
+  "dependencies": {
+    "expo": "^53.0.0",
+    "expo-status-bar": "~2.2.3",
+    "react": "^18.2.0",
+    "react-native": "^0.79.0"
+  }
+}

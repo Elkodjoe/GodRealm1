@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "GodRealm",
+    "slug": "godrealm",
+    "scheme": "godrealm",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "android": {
+      "package": "com.godrealm.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0d0d0d"
+      }
+    },
+    "extra": {
+      "apiUrl": "http://localhost:3001"
+    }
+  }
+}

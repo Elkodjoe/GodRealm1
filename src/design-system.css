@@ -1,0 +1,304 @@
+/* ============================================
+   AFRICAN UNITY & GROWTH APP - DESIGN SYSTEM
+   Pan-African Color Palette & Design Tokens
+   ============================================ */
+
+:root {
+  /* ---- PRIMARY PAN-AFRICAN COLORS ---- */
+  /* Green - Hope, fertility, land */
+  --color-green-primary: #1b5e20;
+  --color-green-light: #43a047;
+  --color-green-lighter: #81c784;
+  --color-green-lightest: #c8e6c9;
+
+  /* Gold/Yellow - Wealth, prosperity, sun */
+  --color-gold-primary: #f9a825;
+  --color-gold-dark: #e68900;
+  --color-gold-light: #ffc107;
+  --color-gold-lightest: #fff59d;
+
+  /* Red - Struggle, strength, passion */
+  --color-red-primary: #c41e3a;
+  --color-red-dark: #8b0000;
+  --color-red-light: #ef5350;
+  --color-red-lightest: #ffcdd2;
+
+  /* Black - People, identity */
+  --color-black-primary: #1a1a1a;
+  --color-black-dark: #000000;
+  --color-black-light: #424242;
+  --color-black-lighter: #757575;
+
+  /* ---- EARTH TONES (Modernized accent colors) ---- */
+  --color-earth-brown: #6d4c41;
+  --color-earth-ochre: #d4a574;
+  --color-earth-sand: #e8dcc8;
+  --color-earth-terracotta: #d84315;
+
+  /* ---- GRADIENT COMBINATIONS ---- */
+  /* Pan-African Unity Gradient */
+  --gradient-pan-african: linear-gradient(
+    135deg,
+    #1b5e20 0%,
+    #f9a825 50%,
+    #c41e3a 100%
+  );
+
+  /* Growth & Prosperity Gradient */
+  --gradient-growth: linear-gradient(
+    135deg,
+    #1b5e20 0%,
+    #43a047 100%
+  );
+
+  /* Vibrant Energy Gradient */
+  --gradient-vibrant: linear-gradient(
+    135deg,
+    #f9a825 0%,
+    #c41e3a 100%
+  );
+
+  /* Neutral Dark Gradient */
+  --gradient-dark: linear-gradient(
+    135deg,
+    #1a1a1a 0%,
+    #424242 100%
+  );
+
+  /* ---- SEMANTIC COLORS ---- */
+  --color-success: #1b5e20;
+  --color-warning: #f9a825;
+  --color-danger: #c41e3a;
+  --color-info: #43a047;
+  --color-neutral: #757575;
+
+  /* ---- NEUTRAL PALETTE ---- */
+  --color-white: #ffffff;
+  --color-gray-50: #fafafa;
+  --color-gray-100: #f5f5f5;
+  --color-gray-200: #eeeeee;
+  --color-gray-300: #e0e0e0;
+  --color-gray-400: #bdbdbd;
+  --color-gray-500: #9e9e9e;
+  --color-gray-600: #757575;
+  --color-gray-700: #616161;
+  --color-gray-800: #424242;
+  --color-gray-900: #212121;
+
+  /* ---- TYPOGRAPHY ---- */
+  /* Font Families */
+  --font-display: 'Poppins', 'Roboto', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'Fira Code', 'Roboto Mono', monospace;
+
+  /* Font Sizes */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+
+  /* Font Weights */
+  --font-thin: 100;
+  --font-extralight: 200;
+  --font-light: 300;
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  --font-extrabold: 800;
+  --font-black: 900;
+
+  /* Line Heights */
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+  --line-height-loose: 2;
+
+  /* Letter Spacing */
+  --letter-spacing-tight: -0.02em;
+  --letter-spacing-normal: 0em;
+  --letter-spacing-wide: 0.025em;
+  --letter-spacing-wider: 0.05em;
+  --letter-spacing-widest: 0.1em;
+
+  /* ---- SPACING SCALE ---- */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 2.5rem;
+  --spacing-3xl: 3rem;
+  --spacing-4xl: 4rem;
+
+  /* ---- BORDER RADIUS ---- */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  /* ---- SHADOWS ---- */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.1), 0 10px 10px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0 25px 50px rgba(0, 0, 0, 0.15);
+
+  /* Pan-African colored shadows */
+  --shadow-green: 0 10px 20px rgba(27, 94, 32, 0.15);
+  --shadow-gold: 0 10px 20px rgba(249, 168, 37, 0.15);
+  --shadow-red: 0 10px 20px rgba(196, 30, 58, 0.15);
+
+  /* ---- TRANSITIONS ---- */
+  --transition-fast: 150ms ease-in-out;
+  --transition-base: 250ms ease-in-out;
+  --transition-slow: 350ms ease-in-out;
+
+  /* ---- BORDER WIDTH ---- */
+  --border-width-thin: 1px;
+  --border-width-medium: 2px;
+  --border-width-thick: 4px;
+
+  /* ---- Z-INDEX SCALE ---- */
+  --z-hide: -1;
+  --z-auto: auto;
+  --z-base: 0;
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-fixed: 30;
+  --z-modal-backdrop: 40;
+  --z-modal: 50;
+  --z-popover: 60;
+  --z-tooltip: 70;
+}
+
+/* ============================================
+   PREFERS DARK MODE
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-gray-50: #121212;
+    --color-gray-100: #1e1e1e;
+    --color-gray-200: #2d2d2d;
+    --color-gray-300: #3f3f3f;
+    --color-gray-400: #4f4f4f;
+    --color-gray-500: #616161;
+    --color-gray-600: #757575;
+    --color-gray-700: #9e9e9e;
+    --color-gray-800: #bdbdbd;
+    --color-gray-900: #e0e0e0;
+  }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+/* Color Utilities */
+.text-green-primary {
+  color: var(--color-green-primary);
+}
+
+.text-gold-primary {
+  color: var(--color-gold-primary);
+}
+
+.text-red-primary {
+  color: var(--color-red-primary);
+}
+
+.bg-green-primary {
+  background-color: var(--color-green-primary);
+}
+
+.bg-gold-primary {
+  background-color: var(--color-gold-primary);
+}
+
+.bg-red-primary {
+  background-color: var(--color-red-primary);
+}
+
+/* Gradient Utilities */
+.gradient-pan-african {
+  background: var(--gradient-pan-african);
+}
+
+.gradient-growth {
+  background: var(--gradient-growth);
+}
+
+.gradient-vibrant {
+  background: var(--gradient-vibrant);
+}
+
+.gradient-dark {
+  background: var(--gradient-dark);
+}
+
+/* Typography Utilities */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Rounded Utilities */
+.rounded-sm {
+  border-radius: var(--radius-sm);
+}
+
+.rounded-md {
+  border-radius: var(--radius-md);
+}
+
+.rounded-lg {
+  border-radius: var(--radius-lg);
+}
+
+.rounded-xl {
+  border-radius: var(--radius-xl);
+}
+
+.rounded-full {
+  border-radius: var(--radius-full);
+}
+
+/* Shadow Utilities */
+.shadow-sm {
+  box-shadow: var(--shadow-sm);
+}
+
+.shadow-md {
+  box-shadow: var(--shadow-md);
+}
+
+.shadow-lg {
+  box-shadow: var(--shadow-lg);
+}
+
+.shadow-green {
+  box-shadow: var(--shadow-green);
+}
+
+.shadow-gold {
+  box-shadow: var(--shadow-gold);
+}
+
+.shadow-red {
+  box-shadow: var(--shadow-red);
+}
