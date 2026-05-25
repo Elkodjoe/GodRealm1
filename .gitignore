@@ -11,3 +11,15 @@ android/app/build
 .idea
 .vscode/*
 !.vscode/extensions.json
+
+# Common caches and build output
+coverage
+.nyc_output
+.cache
+.parcel-cache
+.vite
+*.tsbuildinfo
+*.tgz
+
+# Keep the public example environment file
+!.env.example
