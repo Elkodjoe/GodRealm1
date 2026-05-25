@@ -1,7 +1,7 @@
 services:
   - type: web
     name: godrealm-api
-    env: node
+    runtime: node
     plan: free
     buildCommand: npm install
     startCommand: npm run api
@@ -43,7 +43,7 @@ services:
 
   - type: web
     name: godrealm-web
-    env: static
+    runtime: static
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     envVars:
