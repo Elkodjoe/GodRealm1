@@ -32,6 +32,8 @@ const memory = {
   subscriptions: [],
   streams: [],
   paymentEvents: [],
+  follows: [],
+  savedItems: [],
 }
 
 const seedMedia = [
@@ -301,6 +303,23 @@ const server = http.createServer(async (req, res) => {
       return send(req, res, 200, { channel, media, podcasts })
     }
 
+    if (req.method === 'POST' && url.pathname.startsWith('/api/channels/') && url.pathname.endsWith('/follow')) {
+      const user = await requireUser(req)
+      const handle = decodeURIComponent(url.pathname.split('/')[3])
+      const channels = await listRecordsWithSeed('channels', {}, seedChannels)
+      const channel = channels.find((item) => item.id === handle || item.handle === handle || item.handle === `@${handle}`)
+      if (!channel) return send(req, res, 404, { error: 'Channel not found' })
+      const existing = await findOne('follows', { userId: user.id, channelId: channel.id })
+      if (existing) return send(req, res, 200, { follow: existing, channel })
+      const follow = await addRecord('follows', {
+        userId: user.id,
+        channelId: channel.id,
+        channelName: channel.name,
+        channelHandle: channel.handle,
+      })
+      return send(req, res, 201, { follow, channel })
+    }
+
     if (req.method === 'POST' && url.pathname === '/api/channels') {
       const user = await requireUser(req)
       if (!['creator', 'ministry', 'admin'].includes(user.role)) return send(req, res, 403, { error: 'Creator, ministry, or admin role required' })
@@ -426,6 +445,32 @@ const server = http.createServer(async (req, res) => {
       const provider = normalizeProvider(body.provider || 'stripe')
       const payment = await createPaymentCheckout(user, { ...body, type: 'subscription' }, provider)
       return send(req, res, 201, payment)
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/library/save') {
+      const user = await requireUser(req)
+      const body = await readJson(req)
+      const itemId = requiredText(body.itemId, 'Item id')
+      const itemType = requiredText(body.itemType, 'Item type')
+      const existing = await findOne('savedItems', { userId: user.id, itemId })
+      if (existing) return send(req, res, 200, { savedItem: existing })
+      const savedItem = await addRecord('savedItems', {
+        userId: user.id,
+        itemId,
+        itemType,
+        title: optionalText(body.title),
+        creator: optionalText(body.creator),
+      })
+      return send(req, res, 201, { savedItem })
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/library') {
+      const user = await requireUser(req)
+      const [savedItems, follows] = await Promise.all([
+        listRecords('savedItems', { userId: user.id }),
+        listRecords('follows', { userId: user.id }),
+      ])
+      return send(req, res, 200, { savedItems, follows })
     }
 
     if (req.method === 'GET' && url.pathname === '/api/giving/summary') {

@@ -74,6 +74,22 @@ async function main() {
     body: JSON.stringify({ status: 'approved', note: 'Smoke approved' }),
   })
 
+  await request(`/api/channels/${encodeURIComponent(channel.channel.handle)}/follow`, {
+    method: 'POST',
+    headers: authHeaders(auth.token),
+  })
+
+  await request('/api/library/save', {
+    method: 'POST',
+    headers: authHeaders(auth.token, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      itemId: media.media.id,
+      itemType: 'media',
+      title: media.media.title,
+      creator: media.media.creator,
+    }),
+  })
+
   const donation = await request('/api/donations/checkout', {
     method: 'POST',
     headers: authHeaders(auth.token, { 'Content-Type': 'application/json' }),
@@ -137,6 +153,10 @@ async function main() {
     headers: authHeaders(auth.token),
   })
 
+  const library = await request('/api/library', {
+    headers: authHeaders(auth.token),
+  })
+
   if (!donation.checkoutUrl || !subscription.checkoutUrl || !stream.stream?.id) {
     throw new Error('Checkout or stream creation failed')
   }
@@ -149,11 +169,16 @@ async function main() {
     throw new Error('Prayer or testimony interaction did not update')
   }
 
+  if (!library.savedItems?.length || !library.follows?.length) {
+    throw new Error('Library did not include saved items and follows')
+  }
+
   console.log(`channel=${channel.channel.handle}`)
   console.log(`media=${media.media.title}`)
   console.log(`giving=count:${giving.totals.count} amount:${giving.totals.amountCents}`)
   console.log(`stream=${stream.stream.title}`)
   console.log(`community=prayers:${prayed.prayer.prayerCount} testimonies:${reacted.testimony.reactionCount}`)
+  console.log(`library=saved:${library.savedItems.length} follows:${library.follows.length}`)
 }
 
 main().catch((error) => {

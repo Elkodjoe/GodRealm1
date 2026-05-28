@@ -448,6 +448,8 @@ function App() {
   const [givingSummary, setGivingSummary] = useState({ totals: { count: 0, amountCents: 0, byProvider: {} }, donations: [], subscriptions: [], providers: {} })
   const [streamDraft, setStreamDraft] = useState({ title: 'Friday Prayer Watch', startsAt: new Date(Date.now() + 1000 * 60 * 60 * 2).toISOString().slice(0, 16), provider: 'mux' })
   const [channelDraft, setChannelDraft] = useState({ name: '', handle: '', category: 'Teaching', bio: '' })
+  const [library, setLibrary] = useState({ savedItems: [], follows: [] })
+  const [libraryMessage, setLibraryMessage] = useState('')
 
   const currentCategory = platformCategories.find((category) => category.id === activeCategory)
   const currentPhase = phases.find((phase) => phase.id === activePhase)
@@ -536,6 +538,14 @@ function App() {
         fetch(`${API_URL}/api/giving/summary`).then((res) => res.json()).then((data) => {
           if (!cancelled) setGivingSummary(data)
         }).catch(() => {})
+        if (authToken) {
+          fetch(`${API_URL}/api/library`, { headers: { Authorization: `Bearer ${authToken}` } })
+            .then((res) => res.json())
+            .then((data) => {
+              if (!cancelled) setLibrary({ savedItems: data.savedItems || [], follows: data.follows || [] })
+            })
+            .catch(() => {})
+        }
       } catch {
         if (!cancelled) setApiStatus('Local fallback')
       }
@@ -546,7 +556,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [authToken])
 
   const apiRequest = async (path, options = {}) => {
     const response = await fetch(`${API_URL}${path}`, {
@@ -576,6 +586,12 @@ function App() {
   const refreshGiving = async () => {
     const data = await apiRequest('/api/giving/summary')
     setGivingSummary(data)
+  }
+
+  const refreshLibrary = async () => {
+    if (!authToken) return
+    const data = await apiRequest('/api/library')
+    setLibrary({ savedItems: data.savedItems || [], follows: data.follows || [] })
   }
 
   const uploadFile = async (file, resourceType) => {
@@ -743,6 +759,36 @@ function App() {
       setUploadMessage('Channel created.')
     } catch (error) {
       setUploadMessage(error.message)
+    }
+  }
+
+  const saveLibraryItem = async (item, itemType = 'media') => {
+    setLibraryMessage(`Saving ${item.title || item.episode || item.name}...`)
+    try {
+      await apiRequest('/api/library/save', {
+        method: 'POST',
+        body: JSON.stringify({
+          itemId: item.id,
+          itemType,
+          title: item.title || item.episode || item.name,
+          creator: item.creator || item.hostName || item.name,
+        }),
+      })
+      await refreshLibrary()
+      setLibraryMessage('Saved to your library.')
+    } catch (error) {
+      setLibraryMessage(error.message)
+    }
+  }
+
+  const followChannel = async (channel) => {
+    setLibraryMessage(`Following ${channel.name}...`)
+    try {
+      await apiRequest(`/api/channels/${encodeURIComponent(channel.handle || channel.id)}/follow`, { method: 'POST' })
+      await refreshLibrary()
+      setLibraryMessage(`Following ${channel.name}.`)
+    } catch (error) {
+      setLibraryMessage(error.message)
     }
   }
 
@@ -924,7 +970,7 @@ function App() {
                   </div>
                   <div className="action-row">
                     <button className="primary-action" type="button">Pray</button>
-                    <button className="primary-action" type="button">Follow</button>
+                    <button className="primary-action" type="button" onClick={() => saveLibraryItem(activeMedia, 'media')}>Save</button>
                     <button className="primary-action" type="button">Give</button>
                   </div>
                 </div>
@@ -1017,7 +1063,7 @@ function App() {
                     <h2>{activeChannel.name}</h2>
                     <p>{activeChannel.handle} · {activeChannel.followers || activeChannel.links?.length || 'New'} followers</p>
                   </div>
-                  <button className="primary-action" type="button">Follow</button>
+                  <button className="primary-action" type="button" onClick={() => followChannel(activeChannel)}>Follow</button>
                 </div>
                 <SectionHeader title="Channel Videos" subtitle="Published media by this creator" />
                 <MediaGrid
@@ -1540,17 +1586,33 @@ function App() {
             <SectionHeader title="Library" subtitle="Your saved creators, playlists, prayer history, and profile links" />
             <div className="library-layout">
               <section className="feed-column">
-                <h2>Saved Playlists</h2>
-                <article className="feed-card"><h3>Morning Prayer</h3><p>12 videos and 4 podcast episodes</p></article>
-                <article className="feed-card"><h3>Worship Nights</h3><p>8 saved live replays</p></article>
-                <article className="feed-card"><h3>Testimonies</h3><p>6 stories saved for encouragement</p></article>
+                <h2>Saved Items</h2>
+                {library.savedItems.length ? library.savedItems.map((item) => (
+                  <article className="feed-card" key={item.id}>
+                    <div><strong>{item.title || item.itemId}</strong><span>{item.itemType}</span></div>
+                    <p>{item.creator || 'GodRealm'} saved {item.createdAt ? new Date(item.createdAt).toLocaleString() : 'recently'}</p>
+                  </article>
+                )) : (
+                  <article className="feed-card"><h3>No saved items yet</h3><p>Save sermons, worship videos, podcasts, and streams from the player.</p></article>
+                )}
+              </section>
+              <section className="feed-column">
+                <h2>Following</h2>
+                {library.follows.length ? library.follows.map((follow) => (
+                  <article className="feed-card" key={follow.id}>
+                    <div><strong>{follow.channelName}</strong><span>{follow.channelHandle}</span></div>
+                    <p>Followed {follow.createdAt ? new Date(follow.createdAt).toLocaleString() : 'recently'}</p>
+                  </article>
+                )) : (
+                  <article className="feed-card"><h3>No followed creators yet</h3><p>Follow channels to build a personalized GodRealm home.</p></article>
+                )}
               </section>
               <section className="feed-column">
                 <h2>Creator Tools</h2>
                 <article className="feed-card"><h3>Creator links</h3><p>{savedLinkCount} external platform links saved locally.</p></article>
                 <article className="feed-card"><h3>Profile</h3><p>{session.displayName} · {session.role}</p></article>
                 <article className="feed-card"><h3>Channels</h3><p>{channelFeed.length} creator channels loaded from {apiStatus.toLowerCase()}.</p></article>
-                <article className="feed-card"><h3>Upload queue</h3><p>Video, podcast, testimony, and livestream upload flow is next.</p></article>
+                <article className="feed-card"><h3>Library status</h3><p>{libraryMessage || `${library.savedItems.length} saved and ${library.follows.length} followed.`}</p></article>
               </section>
             </div>
           </>
