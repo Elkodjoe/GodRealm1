@@ -151,6 +151,7 @@ const seedStreams = [
 
 let mongoClient
 let mongoConnectPromise
+let mongoConnectionError = ''
 
 const roles = new Set(['user', 'creator', 'ministry', 'admin'])
 const paymentProviders = new Set(['hubtel', 'paystack', 'stripe'])
@@ -170,6 +171,7 @@ const server = http.createServer(async (req, res) => {
         app: 'GodRealm',
         service: 'api',
         database: database.kind,
+        databaseWarning: database.warning || mongoConnectionError || '',
         payments: paymentReadiness(),
         uploads: cloudinary.cloudName ? 'cloudinary' : 'url-only',
       })
@@ -588,8 +590,19 @@ async function getStore() {
     mongoConnectPromise = mongoClient.connect()
   }
 
-  await mongoConnectPromise
-  return { kind: 'mongodb', db: mongoClient.db(dbName) }
+  try {
+    await mongoConnectPromise
+    mongoConnectionError = ''
+    return { kind: 'mongodb', db: mongoClient.db(dbName) }
+  } catch (error) {
+    mongoConnectionError = error.message || 'MongoDB connection failed'
+    mongoConnectPromise = null
+    if (mongoClient) {
+      await mongoClient.close().catch(() => {})
+      mongoClient = null
+    }
+    return { kind: 'memory', warning: mongoConnectionError }
+  }
 }
 
 async function createUser(body) {
