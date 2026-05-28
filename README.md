@@ -33,7 +33,22 @@ Set the secret environment variables in Render:
 
 ```text
 /api/health
+/api/readiness
 ```
+
+For the deployed Render API:
+
+```bash
+npm run test:remote
+```
+
+To check another API URL:
+
+```bash
+API_URL=https://your-render-service.onrender.com npm run test:remote
+```
+
+If `/api/health` reports a MongoDB warning, replace `MONGODB_URI` in Render with the exact MongoDB Atlas driver connection string. A malformed Atlas host should not take the API offline; the service falls back to memory mode and exposes the warning in `/api/readiness`.
 
 ## Smoke Test
 

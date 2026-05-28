@@ -177,6 +177,35 @@ const server = http.createServer(async (req, res) => {
       })
     }
 
+    if (req.method === 'GET' && url.pathname === '/api/readiness') {
+      const database = await getStore()
+      const payments = paymentReadiness()
+      const uploadReady = Boolean(cloudinary.cloudName && cloudinary.apiKey && cloudinary.apiSecret)
+      return send(req, res, 200, {
+        ok: true,
+        app: 'GodRealm',
+        database: {
+          mode: database.kind,
+          configured: Boolean(mongoUri),
+          warning: database.warning || mongoConnectionError || '',
+        },
+        uploads: {
+          provider: uploadReady ? 'cloudinary' : 'url-only',
+          configured: uploadReady,
+        },
+        payments,
+        routes: [
+          '/api/health',
+          '/api/media',
+          '/api/channels',
+          '/api/streams',
+          '/api/giving/summary',
+          '/api/feed/prayers',
+          '/api/testimonies',
+        ],
+      })
+    }
+
     if (req.method === 'POST' && url.pathname === '/api/auth/register') {
       const body = await readJson(req)
       const user = await createUser(body)
