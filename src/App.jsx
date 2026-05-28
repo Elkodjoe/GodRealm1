@@ -450,6 +450,9 @@ function App() {
   const [channelDraft, setChannelDraft] = useState({ name: '', handle: '', category: 'Teaching', bio: '' })
   const [library, setLibrary] = useState({ savedItems: [], follows: [] })
   const [libraryMessage, setLibraryMessage] = useState('')
+  const [reportDraft, setReportDraft] = useState({ reason: 'inappropriate_content', details: '' })
+  const [reportMessage, setReportMessage] = useState('')
+  const [adminReports, setAdminReports] = useState([])
 
   const currentCategory = platformCategories.find((category) => category.id === activeCategory)
   const currentPhase = phases.find((phase) => phase.id === activePhase)
@@ -792,6 +795,48 @@ function App() {
     }
   }
 
+  const submitReport = async (targetType, item) => {
+    setReportMessage(`Reporting ${item.title || item.name || targetType}...`)
+    try {
+      await apiRequest('/api/reports', {
+        method: 'POST',
+        body: JSON.stringify({
+          targetType,
+          targetId: item.id || item.handle,
+          targetTitle: item.title || item.episode || item.name,
+          reason: reportDraft.reason,
+          details: reportDraft.details,
+        }),
+      })
+      setReportDraft({ reason: 'inappropriate_content', details: '' })
+      setReportMessage('Report sent to the safety team.')
+    } catch (error) {
+      setReportMessage(error.message)
+    }
+  }
+
+  const loadAdminReports = async () => {
+    try {
+      const data = await apiRequest('/api/admin/reports')
+      setAdminReports(data.reports || [])
+    } catch (error) {
+      setAdminMessage(error.message)
+    }
+  }
+
+  const updateAdminReport = async (report, status) => {
+    try {
+      const data = await apiRequest(`/api/admin/reports/${report.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status, note: `Marked ${status} from GodRealm admin panel` }),
+      })
+      setAdminReports((current) => current.map((item) => (item.id === report.id ? data.report : item)))
+      setAdminMessage(`Report marked ${status}.`)
+    } catch (error) {
+      setAdminMessage(error.message)
+    }
+  }
+
   const speak = (text) => {
     if (!('speechSynthesis' in window)) return
     window.speechSynthesis.cancel()
@@ -972,6 +1017,7 @@ function App() {
                     <button className="primary-action" type="button">Pray</button>
                     <button className="primary-action" type="button" onClick={() => saveLibraryItem(activeMedia, 'media')}>Save</button>
                     <button className="primary-action" type="button">Give</button>
+                    <button className="primary-action" type="button" onClick={() => submitReport('media', activeMedia)}>Report</button>
                   </div>
                 </div>
               </div>
@@ -1064,6 +1110,7 @@ function App() {
                     <p>{activeChannel.handle} · {activeChannel.followers || activeChannel.links?.length || 'New'} followers</p>
                   </div>
                   <button className="primary-action" type="button" onClick={() => followChannel(activeChannel)}>Follow</button>
+                  <button className="primary-action" type="button" onClick={() => submitReport('channel', activeChannel)}>Report</button>
                 </div>
                 <SectionHeader title="Channel Videos" subtitle="Published media by this creator" />
                 <MediaGrid
@@ -1476,6 +1523,7 @@ function App() {
                 {adminMessage && <p className="form-note">{adminMessage}</p>}
               </div>
               <div className="admin-list">
+                <button className="primary-action" type="button" onClick={loadAdminReports}>Load Safety Reports</button>
                 {mediaFeed.map((item) => (
                   <article className="feed-card" key={item.id}>
                     <div>
@@ -1491,8 +1539,32 @@ function App() {
                   </article>
                 ))}
               </div>
+              <div className="admin-list">
+                <h2>Safety Inbox</h2>
+                {adminReports.length ? adminReports.map((report) => (
+                  <article className="feed-card" key={report.id}>
+                    <div>
+                      <strong>{report.targetTitle || report.targetId}</strong>
+                      <span>{report.status}</span>
+                    </div>
+                    <p>{report.targetType} · {report.reason}</p>
+                    <p>{report.details || 'No extra details provided.'}</p>
+                    <div className="action-row">
+                      <button className="primary-action" type="button" onClick={() => updateAdminReport(report, 'reviewing')}>Reviewing</button>
+                      <button className="primary-action" type="button" onClick={() => updateAdminReport(report, 'resolved')}>Resolve</button>
+                      <button className="primary-action" type="button" onClick={() => updateAdminReport(report, 'dismissed')}>Dismiss</button>
+                    </div>
+                  </article>
+                )) : (
+                  <article className="feed-card"><h3>No reports loaded</h3><p>Load the safety inbox to review member reports.</p></article>
+                )}
+              </div>
             </section>
           </>
+        )}
+
+        {reportMessage && (
+          <p className="floating-note">{reportMessage}</p>
         )}
 
         {tab === 'search' && (

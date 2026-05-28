@@ -375,6 +375,20 @@
   padding-left: 10px;
 }
 
+.floating-note {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 30;
+  max-width: min(360px, calc(100vw - 36px));
+  border: 1px solid rgba(201, 168, 76, 0.35);
+  border-radius: 8px;
+  background: rgba(9, 9, 9, 0.94);
+  color: #d9c171;
+  padding: 12px 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.36);
+}
+
 .mvp-form textarea {
   min-height: 110px;
   resize: vertical;

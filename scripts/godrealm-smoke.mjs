@@ -90,6 +90,32 @@ async function main() {
     }),
   })
 
+  const report = await request('/api/reports', {
+    method: 'POST',
+    headers: authHeaders(auth.token, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      targetType: 'media',
+      targetId: media.media.id,
+      targetTitle: media.media.title,
+      reason: 'inappropriate_content',
+      details: 'Smoke test report',
+    }),
+  })
+
+  const adminReports = await request('/api/admin/reports', {
+    headers: authHeaders(auth.token),
+  })
+
+  const foundReport = adminReports.reports?.find((item) => item.id === report.report.id)
+  if (!foundReport) throw new Error('Admin reports did not include smoke report')
+
+  const resolvedReport = await request(`/api/admin/reports/${report.report.id}`, {
+    method: 'PATCH',
+    headers: authHeaders(auth.token, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ status: 'resolved', note: 'Smoke resolved' }),
+  })
+  if (resolvedReport.report?.status !== 'resolved') throw new Error('Report did not resolve')
+
   const donation = await request('/api/donations/checkout', {
     method: 'POST',
     headers: authHeaders(auth.token, { 'Content-Type': 'application/json' }),
@@ -179,6 +205,7 @@ async function main() {
   console.log(`stream=${stream.stream.title}`)
   console.log(`community=prayers:${prayed.prayer.prayerCount} testimonies:${reacted.testimony.reactionCount}`)
   console.log(`library=saved:${library.savedItems.length} follows:${library.follows.length}`)
+  console.log(`reports=${resolvedReport.report.status}`)
 }
 
 main().catch((error) => {

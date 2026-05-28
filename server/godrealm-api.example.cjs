@@ -34,6 +34,7 @@ const memory = {
   paymentEvents: [],
   follows: [],
   savedItems: [],
+  reports: [],
 }
 
 const seedMedia = [
@@ -462,6 +463,47 @@ const server = http.createServer(async (req, res) => {
         creator: optionalText(body.creator),
       })
       return send(req, res, 201, { savedItem })
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/reports') {
+      const user = await requireUser(req)
+      const body = await readJson(req)
+      const targetType = requiredText(body.targetType, 'Target type')
+      const targetId = requiredText(body.targetId, 'Target id')
+      const report = await addRecord('reports', {
+        reporterId: user.id,
+        reporterName: user.displayName,
+        targetType,
+        targetId,
+        targetTitle: optionalText(body.targetTitle),
+        reason: requiredText(body.reason, 'Reason'),
+        details: optionalText(body.details),
+        status: 'open',
+      })
+      return send(req, res, 201, { report })
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/admin/reports') {
+      const user = await requireUser(req)
+      if (!['admin', 'ministry'].includes(user.role)) return send(req, res, 403, { error: 'Admin or ministry role required' })
+      return send(req, res, 200, { reports: await listRecords('reports') })
+    }
+
+    if (req.method === 'PATCH' && url.pathname.startsWith('/api/admin/reports/')) {
+      const user = await requireUser(req)
+      if (!['admin', 'ministry'].includes(user.role)) return send(req, res, 403, { error: 'Admin or ministry role required' })
+      const id = url.pathname.split('/')[4]
+      const body = await readJson(req)
+      const status = optionalText(body.status) || 'reviewing'
+      if (!['open', 'reviewing', 'resolved', 'dismissed'].includes(status)) return send(req, res, 400, { error: 'Invalid report status' })
+      const report = await updateRecord('reports', { id }, {
+        status,
+        adminNote: optionalText(body.note),
+        reviewedBy: user.id,
+        reviewedAt: new Date().toISOString(),
+      })
+      if (!report) return send(req, res, 404, { error: 'Report not found' })
+      return send(req, res, 200, { report })
     }
 
     if (req.method === 'GET' && url.pathname === '/api/library') {
