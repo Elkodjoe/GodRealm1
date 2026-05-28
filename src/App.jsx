@@ -347,12 +347,16 @@ const apiPlan = [
   ['GET /api/podcasts', 'List podcast shows and episodes.'],
   ['POST /api/podcasts', 'Publish a podcast episode record.'],
   ['GET /api/channels', 'List creator and ministry channels.'],
+  ['POST /api/channels', 'Create a creator or ministry channel.'],
+  ['GET /api/channels/:handle', 'Load a channel page with its videos and podcasts.'],
   ['GET /api/feed/prayers', 'List public prayer requests and devotional posts.'],
   ['POST /api/testimonies', 'Create written, audio, or video testimony records.'],
   ['POST /api/creator-links', 'Save external podcast, music, book, course, and social links.'],
   ['POST /api/donations/checkout', 'Start a one-time or recurring donation checkout.'],
   ['POST /api/subscriptions/checkout', 'Start a GodRealm membership checkout.'],
+  ['GET /api/giving/summary', 'Show donation and subscription totals by provider.'],
   ['POST /api/streams/schedule', 'Schedule a worship, sermon, or prayer livestream.'],
+  ['GET /api/streams', 'List scheduled and live prayer rooms or worship events.'],
 ]
 
 const schemas = [
@@ -375,6 +379,7 @@ const tabs = [
   ['podcasts', 'Podcasts'],
   ['live', 'Live'],
   ['channels', 'Channels'],
+  ['giving', 'Giving'],
   ['upload', 'Upload'],
   ['creator', 'Creator'],
   ['admin', 'Admin'],
@@ -382,6 +387,10 @@ const tabs = [
   ['search', 'Christian Search'],
   ['library', 'Library'],
   ['language', 'Languages'],
+  ['links', 'Links'],
+  ['roadmap', 'Roadmap'],
+  ['backend', 'Backend'],
+  ['mobile', 'Mobile'],
 ]
 
 const loadStored = (key, fallback) => {
@@ -401,6 +410,14 @@ function App() {
   const [mediaFeed, setMediaFeed] = useState(mediaItems)
   const [podcastFeed, setPodcastFeed] = useState(podcastItems)
   const [channelFeed, setChannelFeed] = useState(profiles)
+  const [streamFeed, setStreamFeed] = useState(liveItems.map(([title, host, audience, accent], index) => ({
+    id: `local-stream-${index}`,
+    title,
+    hostName: host,
+    audience,
+    accent,
+    status: audience.toLowerCase().includes('praying') ? 'live' : 'scheduled',
+  })))
   const [apiStatus, setApiStatus] = useState('Local fallback')
   const [session, setSession] = useState(() => loadStored('godrealm.session', seedSession))
   const [authToken, setAuthToken] = useState(() => loadStored('godrealm.authToken', ''))
@@ -426,6 +443,11 @@ function App() {
   const [audioFile, setAudioFile] = useState(null)
   const [activeChannel, setActiveChannel] = useState(profiles[0])
   const [adminMessage, setAdminMessage] = useState('')
+  const [givingDraft, setGivingDraft] = useState({ provider: 'paystack', type: 'donation', tier: 'Faithful', amount: '2500', ministryId: 'GodRealm Studio' })
+  const [paymentMessage, setPaymentMessage] = useState('')
+  const [givingSummary, setGivingSummary] = useState({ totals: { count: 0, amountCents: 0, byProvider: {} }, donations: [], subscriptions: [], providers: {} })
+  const [streamDraft, setStreamDraft] = useState({ title: 'Friday Prayer Watch', startsAt: new Date(Date.now() + 1000 * 60 * 60 * 2).toISOString().slice(0, 16), provider: 'mux' })
+  const [channelDraft, setChannelDraft] = useState({ name: '', handle: '', category: 'Teaching', bio: '' })
 
   const currentCategory = platformCategories.find((category) => category.id === activeCategory)
   const currentPhase = phases.find((phase) => phase.id === activePhase)
@@ -481,17 +503,21 @@ function App() {
           fetch(`${API_URL}/api/media`),
           fetch(`${API_URL}/api/podcasts`),
           fetch(`${API_URL}/api/channels`),
+          fetch(`${API_URL}/api/feed/prayers`),
+          fetch(`${API_URL}/api/testimonies`),
         ])
 
-        if (!healthRes.ok || !mediaRes.ok || !podcastRes.ok || !channelRes.ok) {
+        if (!healthRes.ok || !mediaRes.ok || !podcastRes.ok || !channelRes.ok || !prayerRes.ok || !testimonyRes.ok) {
           throw new Error('GodRealm API unavailable')
         }
 
-        const [health, mediaData, podcastData, channelData] = await Promise.all([
+        const [health, mediaData, podcastData, channelData, prayerData, testimonyData] = await Promise.all([
           healthRes.json(),
           mediaRes.json(),
           podcastRes.json(),
           channelRes.json(),
+          prayerRes.json(),
+          testimonyRes.json(),
         ])
 
         if (cancelled) return
@@ -500,8 +526,16 @@ function App() {
         setMediaFeed(nextMedia)
         setPodcastFeed(podcastData.podcasts?.length ? podcastData.podcasts : podcastItems)
         setChannelFeed(channelData.channels?.length ? channelData.channels : profiles)
+        if (prayerData.prayers?.length) setPrayers(prayerData.prayers)
+        if (testimonyData.testimonies?.length) setTestimonies(testimonyData.testimonies)
         setActiveMedia((current) => nextMedia.find((item) => item.id === current.id) || nextMedia[0])
         setApiStatus(`API connected: ${health.database}`)
+        fetch(`${API_URL}/api/streams`).then((res) => res.json()).then((data) => {
+          if (!cancelled && data.streams?.length) setStreamFeed(data.streams)
+        }).catch(() => {})
+        fetch(`${API_URL}/api/giving/summary`).then((res) => res.json()).then((data) => {
+          if (!cancelled) setGivingSummary(data)
+        }).catch(() => {})
       } catch {
         if (!cancelled) setApiStatus('Local fallback')
       }
@@ -537,6 +571,11 @@ function App() {
     setMediaFeed(nextMedia)
     setPodcastFeed(podcastData.podcasts?.length ? podcastData.podcasts : podcastItems)
     setActiveMedia(nextMedia[0])
+  }
+
+  const refreshGiving = async () => {
+    const data = await apiRequest('/api/giving/summary')
+    setGivingSummary(data)
   }
 
   const uploadFile = async (file, resourceType) => {
@@ -643,6 +682,70 @@ function App() {
     }
   }
 
+  const createCheckout = async (event) => {
+    event.preventDefault()
+    setPaymentMessage('Creating checkout...')
+    try {
+      const path = givingDraft.type === 'subscription' ? '/api/subscriptions/checkout' : '/api/donations/checkout'
+      const data = await apiRequest(path, {
+        method: 'POST',
+        body: JSON.stringify({
+          provider: givingDraft.provider,
+          tier: givingDraft.tier,
+          ministryId: givingDraft.ministryId,
+          amountCents: Number(givingDraft.amount),
+        }),
+      })
+      setPaymentMessage(`${data.provider} checkout ready: ${data.checkoutUrl}`)
+      await refreshGiving()
+    } catch (error) {
+      setPaymentMessage(error.message)
+    }
+  }
+
+  const scheduleStream = async (event) => {
+    event.preventDefault()
+    setUploadMessage('Scheduling livestream...')
+    try {
+      const data = await apiRequest('/api/streams/schedule', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: streamDraft.title,
+          startsAt: new Date(streamDraft.startsAt).toISOString(),
+          provider: streamDraft.provider,
+          audience: 'Scheduled from creator console',
+        }),
+      })
+      setStreamFeed((current) => [data.stream, ...current])
+      setUploadMessage('Livestream scheduled.')
+    } catch (error) {
+      setUploadMessage(error.message)
+    }
+  }
+
+  const createChannel = async (event) => {
+    event.preventDefault()
+    setUploadMessage('Creating channel...')
+    try {
+      const data = await apiRequest('/api/channels', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: channelDraft.name || session.displayName,
+          handle: channelDraft.handle || session.displayName,
+          category: channelDraft.category,
+          bio: channelDraft.bio,
+          givingEnabled: true,
+        }),
+      })
+      setChannelFeed((current) => [data.channel, ...current])
+      setActiveChannel(data.channel)
+      setChannelDraft({ name: '', handle: '', category: 'Teaching', bio: '' })
+      setUploadMessage('Channel created.')
+    } catch (error) {
+      setUploadMessage(error.message)
+    }
+  }
+
   const speak = (text) => {
     if (!('speechSynthesis' in window)) return
     window.speechSynthesis.cancel()
@@ -680,43 +783,84 @@ function App() {
     })
   }
 
-  const addPrayer = (event) => {
+  const addPrayer = async (event) => {
     event.preventDefault()
     const body = prayerDraft.trim()
     if (!body) return
 
-    setPrayers((current) => [
-      {
-        id: crypto.randomUUID(),
-        author: session.displayName,
-        body,
-        verseRef: verseDraft.trim(),
-        prayerCount: 0,
-        createdAt: 'Just now',
-      },
-      ...current,
-    ])
-    setPrayerDraft('')
-    setVerseDraft('')
+    try {
+      const data = await apiRequest('/api/feed/prayers', {
+        method: 'POST',
+        body: JSON.stringify({ body, verseRef: verseDraft.trim() }),
+      })
+      setPrayers((current) => [data.prayer, ...current])
+      setPrayerDraft('')
+      setVerseDraft('')
+    } catch {
+      setPrayers((current) => [
+        {
+          id: crypto.randomUUID(),
+          author: session.displayName,
+          body,
+          verseRef: verseDraft.trim(),
+          prayerCount: 0,
+          createdAt: 'Just now',
+        },
+        ...current,
+      ])
+      setPrayerDraft('')
+      setVerseDraft('')
+    }
   }
 
-  const addTestimony = (event) => {
+  const addTestimony = async (event) => {
     event.preventDefault()
     const title = testimonyDraft.title.trim()
     const story = testimonyDraft.story.trim()
     if (!title || !story) return
 
-    setTestimonies((current) => [
-      {
-        id: crypto.randomUUID(),
-        author: session.displayName,
-        title,
-        story,
-        createdAt: 'Just now',
-      },
-      ...current,
-    ])
-    setTestimonyDraft({ title: '', story: '' })
+    try {
+      const data = await apiRequest('/api/testimonies', {
+        method: 'POST',
+        body: JSON.stringify({ title, story }),
+      })
+      setTestimonies((current) => [data.testimony, ...current])
+      setTestimonyDraft({ title: '', story: '' })
+    } catch {
+      setTestimonies((current) => [
+        {
+          id: crypto.randomUUID(),
+          author: session.displayName,
+          title,
+          story,
+          createdAt: 'Just now',
+        },
+        ...current,
+      ])
+      setTestimonyDraft({ title: '', story: '' })
+    }
+  }
+
+  const prayWithRequest = async (prayer) => {
+    try {
+      const data = await apiRequest(`/api/feed/prayers/${prayer.id}/pray`, { method: 'POST' })
+      setPrayers((current) => current.map((item) => (item.id === prayer.id ? data.prayer : item)))
+    } catch {
+      setPrayers((current) => current.map((item) => (
+        item.id === prayer.id ? { ...item, prayerCount: Number(item.prayerCount || 0) + 1 } : item
+      )))
+    }
+  }
+
+  const reactToTestimony = async (testimony) => {
+    try {
+      const data = await apiRequest(`/api/testimonies/${testimony.id}/react`, { method: 'POST' })
+      setTestimonies((current) => current.map((item) => (item.id === testimony.id ? data.testimony : item)))
+    } catch {
+      setTestimonies((current) => current.map((item) => (
+        item.id === testimony.id ? { ...item, reactionCount: Number(item.reactionCount || 0) + 1 } : item
+      )))
+    }
   }
 
   const addLink = (platform) => {
@@ -835,12 +979,12 @@ function App() {
           <>
             <SectionHeader title="Live" subtitle="Prayer rooms, worship services, sermons, and Bible studies" />
             <div className="live-grid">
-              {liveItems.map(([title, host, status, accent]) => (
-                <article className="live-card" key={title} style={{ '--accent': accent }}>
-                  <span>Live</span>
-                  <h2>{title}</h2>
-                  <p>{host}</p>
-                  <strong>{status}</strong>
+              {streamFeed.map((stream) => (
+                <article className="live-card" key={stream.id || stream.title} style={{ '--accent': stream.accent || '#c0392b' }}>
+                  <span>{stream.status || 'scheduled'}</span>
+                  <h2>{stream.title}</h2>
+                  <p>{stream.hostName || stream.host || 'GodRealm creator'}</p>
+                  <strong>{stream.audience || new Date(stream.startsAt).toLocaleString()}</strong>
                 </article>
               ))}
             </div>
@@ -1008,6 +1152,56 @@ function App() {
                 <button className="primary-action" type="submit">Publish podcast</button>
                 {uploadMessage && <p className="form-note">{uploadMessage}</p>}
               </form>
+
+              <form className="mvp-form" onSubmit={createChannel}>
+                <p className="eyebrow">Channel setup</p>
+                <h2>Create creator channel</h2>
+                <label>
+                  Channel name
+                  <input value={channelDraft.name} onChange={(event) => setChannelDraft({ ...channelDraft, name: event.target.value })} placeholder={session.displayName} />
+                </label>
+                <label>
+                  Handle
+                  <input value={channelDraft.handle} onChange={(event) => setChannelDraft({ ...channelDraft, handle: event.target.value })} placeholder="@yourministry" />
+                </label>
+                <label>
+                  Category
+                  <select value={channelDraft.category} onChange={(event) => setChannelDraft({ ...channelDraft, category: event.target.value })}>
+                    <option>Teaching</option>
+                    <option>Worship</option>
+                    <option>Testimony</option>
+                    <option>Ministry</option>
+                    <option>Prayer</option>
+                  </select>
+                </label>
+                <label>
+                  Bio
+                  <textarea value={channelDraft.bio} onChange={(event) => setChannelDraft({ ...channelDraft, bio: event.target.value })} />
+                </label>
+                <button className="primary-action" type="submit">Create channel</button>
+              </form>
+
+              <form className="mvp-form" onSubmit={scheduleStream}>
+                <p className="eyebrow">Livestream</p>
+                <h2>Schedule worship or prayer</h2>
+                <label>
+                  Stream title
+                  <input value={streamDraft.title} onChange={(event) => setStreamDraft({ ...streamDraft, title: event.target.value })} />
+                </label>
+                <label>
+                  Start time
+                  <input type="datetime-local" value={streamDraft.startsAt} onChange={(event) => setStreamDraft({ ...streamDraft, startsAt: event.target.value })} />
+                </label>
+                <label>
+                  Provider
+                  <select value={streamDraft.provider} onChange={(event) => setStreamDraft({ ...streamDraft, provider: event.target.value })}>
+                    <option value="mux">Mux</option>
+                    <option value="youtube">YouTube</option>
+                    <option value="livekit">LiveKit</option>
+                  </select>
+                </label>
+                <button className="primary-action" type="submit">Schedule stream</button>
+              </form>
             </section>
           </>
         )}
@@ -1026,6 +1220,10 @@ function App() {
                 <article className="feed-card">
                   <h3>Storage</h3>
                   <p>Cloudinary uploads activate when Render has CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET.</p>
+                </article>
+                <article className="feed-card">
+                  <h3>Revenue</h3>
+                  <p>{givingSummary.totals?.count || 0} checkout records · ${((givingSummary.totals?.amountCents || 0) / 100).toFixed(2)} tracked.</p>
                 </article>
               </div>
               <div className="feed-column">
@@ -1048,6 +1246,65 @@ function App() {
                   </article>
                 )) : <article className="feed-card"><p>No podcast episodes yet.</p></article>}
               </div>
+            </section>
+          </>
+        )}
+
+        {tab === 'giving' && (
+          <>
+            <SectionHeader title="Giving and Membership" subtitle="Donation, subscription, and ministry support checkout flows" />
+            <section className="giving-layout">
+              <form className="mvp-form" onSubmit={createCheckout}>
+                <p className="eyebrow">Checkout</p>
+                <h2>Create giving flow</h2>
+                <label>
+                  Flow type
+                  <select value={givingDraft.type} onChange={(event) => setGivingDraft({ ...givingDraft, type: event.target.value })}>
+                    <option value="donation">Donation</option>
+                    <option value="subscription">Subscription</option>
+                  </select>
+                </label>
+                <label>
+                  Provider
+                  <select value={givingDraft.provider} onChange={(event) => setGivingDraft({ ...givingDraft, provider: event.target.value })}>
+                    <option value="paystack">Paystack</option>
+                    <option value="hubtel">Hubtel</option>
+                    <option value="stripe">Stripe</option>
+                  </select>
+                </label>
+                <label>
+                  Tier or purpose
+                  <input value={givingDraft.tier} onChange={(event) => setGivingDraft({ ...givingDraft, tier: event.target.value })} />
+                </label>
+                <label>
+                  Amount in cents/pesewas
+                  <input value={givingDraft.amount} onChange={(event) => setGivingDraft({ ...givingDraft, amount: event.target.value })} />
+                </label>
+                <label>
+                  Ministry or creator
+                  <input value={givingDraft.ministryId} onChange={(event) => setGivingDraft({ ...givingDraft, ministryId: event.target.value })} />
+                </label>
+                <button className="primary-action" type="submit">Create checkout</button>
+                {paymentMessage && <p className="form-note">{paymentMessage}</p>}
+              </form>
+
+              <section className="feed-column">
+                <h2>Giving summary</h2>
+                <article className="feed-card">
+                  <h3>Total tracked</h3>
+                  <p>{givingSummary.totals?.count || 0} checkout records · ${((givingSummary.totals?.amountCents || 0) / 100).toFixed(2)}</p>
+                </article>
+                <article className="feed-card">
+                  <h3>Provider readiness</h3>
+                  <p>Hubtel: {givingSummary.providers?.hubtel ? 'Configured' : 'Prototype'} · Paystack: {givingSummary.providers?.paystack ? 'Configured' : 'Prototype'} · Stripe: {givingSummary.providers?.stripe ? 'Configured' : 'Prototype'}</p>
+                </article>
+                {[...(givingSummary.donations || []), ...(givingSummary.subscriptions || [])].slice(0, 6).map((item) => (
+                  <article className="feed-card" key={item.id}>
+                    <div><strong>{item.type || 'donation'}</strong><span>{item.provider}</span></div>
+                    <p>{item.tier || item.ministryId || 'GodRealm'} · ${((item.amountCents || 0) / 100).toFixed(2)}</p>
+                  </article>
+                ))}
+              </section>
             </section>
           </>
         )}
@@ -1134,11 +1391,9 @@ function App() {
                     {prayer.verseRef && <em>{prayer.verseRef}</em>}
                     <button
                       type="button"
-                      onClick={() => setPrayers((current) => current.map((item) => (
-                        item.id === prayer.id ? { ...item, prayerCount: item.prayerCount + 1 } : item
-                      )))}
+                      onClick={() => prayWithRequest(prayer)}
                     >
-                      Pray with them ({prayer.prayerCount})
+                      Pray with them ({prayer.prayerCount || 0})
                     </button>
                   </article>
                 ))}
@@ -1154,6 +1409,9 @@ function App() {
                     </div>
                     <h3>{testimony.title}</h3>
                     <p>{testimony.story}</p>
+                    <button type="button" onClick={() => reactToTestimony(testimony)}>
+                      Amen ({testimony.reactionCount || 0})
+                    </button>
                   </article>
                 ))}
               </section>

@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "api": "node server/godrealm-api.example.cjs",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test:smoke": "node scripts/godrealm-smoke.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.4",

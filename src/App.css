@@ -145,7 +145,8 @@
 .upload-layout,
 .channel-layout,
 .admin-panel,
-.creator-dashboard {
+.creator-dashboard,
+.giving-layout {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 14px;
@@ -174,7 +175,8 @@
 .live-card,
 .channel-list,
 .channel-page,
-.admin-panel {
+.admin-panel,
+.giving-layout {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(17, 17, 17, 0.92);
@@ -192,7 +194,8 @@
 .media-card,
 .podcast-card,
 .audio-player,
-.live-card {
+.live-card,
+.giving-layout {
   padding: 20px;
 }
 

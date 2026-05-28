@@ -34,3 +34,13 @@ Set the secret environment variables in Render:
 ```text
 /api/health
 ```
+
+## Smoke Test
+
+With the API running on port 3001:
+
+```bash
+npm run test:smoke
+```
+
+The smoke test registers an admin creator, creates a channel, publishes and moderates media, creates donation and subscription checkouts, schedules a stream, and verifies the giving summary.

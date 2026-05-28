@@ -121,6 +121,31 @@ const seedChannels = [
   { id: 'channel-3', name: 'Sister Blessing Addo', handle: '@blessingaddo', category: 'Testimony', followers: '12K', createdAt: '2026-05-24T00:00:00.000Z' },
 ]
 
+const seedStreams = [
+  {
+    id: 'stream-1',
+    hostId: 'seed',
+    hostName: 'GodRealm Studio',
+    title: 'Live Prayer Room',
+    startsAt: new Date(Date.now() + 1000 * 60 * 45).toISOString(),
+    provider: 'mux',
+    status: 'scheduled',
+    audience: '126 praying now',
+    accent: '#c0392b',
+  },
+  {
+    id: 'stream-2',
+    hostId: 'seed',
+    hostName: 'Kingdom Chapel Global',
+    title: 'Sunday Worship Service',
+    startsAt: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
+    provider: 'youtube',
+    status: 'scheduled',
+    audience: 'Starts tomorrow',
+    accent: '#c9a84c',
+  },
+]
+
 let mongoClient
 let mongoConnectPromise
 
@@ -142,7 +167,7 @@ const server = http.createServer(async (req, res) => {
         app: 'GodRealm',
         service: 'api',
         database: database.kind,
-        payments: ['hubtel', 'paystack', 'stripe'],
+        payments: paymentReadiness(),
         uploads: cloudinary.cloudName ? 'cloudinary' : 'url-only',
       })
     }
@@ -188,11 +213,16 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && url.pathname === '/api/creator/dashboard') {
       const user = await requireUser(req)
+      const donations = await listRecords('donations', { userId: user.id })
+      const subscriptions = await listRecords('subscriptions', { userId: user.id })
+      const streams = await listRecords('streams', { hostId: user.id })
       return send(req, res, 200, {
         user: publicUser(user),
         media: await listRecords('media', { userId: user.id }),
         podcasts: await listRecords('podcasts', { userId: user.id }),
         creatorLinks: await listRecords('creatorLinks', { userId: user.id }),
+        streams,
+        revenue: revenueSummary([...donations, ...subscriptions]),
       })
     }
 
@@ -261,6 +291,36 @@ const server = http.createServer(async (req, res) => {
       return send(req, res, 200, { channels: await listRecordsWithSeed('channels', {}, seedChannels) })
     }
 
+    if (req.method === 'GET' && url.pathname.startsWith('/api/channels/')) {
+      const handle = decodeURIComponent(url.pathname.split('/').pop())
+      const channels = await listRecordsWithSeed('channels', {}, seedChannels)
+      const channel = channels.find((item) => item.id === handle || item.handle === handle || item.handle === `@${handle}`)
+      if (!channel) return send(req, res, 404, { error: 'Channel not found' })
+      const media = (await listRecordsWithSeed('media', {}, seedMedia)).filter((item) => item.creator === channel.name || item.userId === channel.userId)
+      const podcasts = (await listRecordsWithSeed('podcasts', {}, seedPodcasts)).filter((item) => item.creator === channel.name || item.userId === channel.userId)
+      return send(req, res, 200, { channel, media, podcasts })
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/channels') {
+      const user = await requireUser(req)
+      if (!['creator', 'ministry', 'admin'].includes(user.role)) return send(req, res, 403, { error: 'Creator, ministry, or admin role required' })
+      const body = await readJson(req)
+      const name = requiredText(body.name || user.displayName, 'Channel name')
+      const handle = normalizeHandle(body.handle || name)
+      const exists = await findOne('channels', { handle })
+      if (exists) return send(req, res, 409, { error: 'Channel handle is already taken' })
+      const channel = await addRecord('channels', {
+        userId: user.id,
+        name,
+        handle,
+        category: optionalText(body.category) || user.role,
+        followers: '0',
+        bio: optionalText(body.bio),
+        givingEnabled: Boolean(body.givingEnabled ?? true),
+      })
+      return send(req, res, 201, { channel })
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/feed/prayers') {
       return send(req, res, 200, { prayers: await listRecords('prayers') })
     }
@@ -280,6 +340,18 @@ const server = http.createServer(async (req, res) => {
       return send(req, res, 201, { prayer })
     }
 
+    if (req.method === 'POST' && url.pathname.startsWith('/api/feed/prayers/') && url.pathname.endsWith('/pray')) {
+      await requireUser(req)
+      const id = url.pathname.split('/')[4]
+      const prayer = await findOne('prayers', { id })
+      if (!prayer) return send(req, res, 404, { error: 'Prayer request not found' })
+      const updated = await updateRecord('prayers', { id }, {
+        prayerCount: Number(prayer.prayerCount || 0) + 1,
+        lastPrayedAt: new Date().toISOString(),
+      })
+      return send(req, res, 200, { prayer: updated })
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/testimonies') {
       return send(req, res, 200, { testimonies: await listRecords('testimonies') })
     }
@@ -297,6 +369,18 @@ const server = http.createServer(async (req, res) => {
         reactionCount: 0,
       })
       return send(req, res, 201, { testimony })
+    }
+
+    if (req.method === 'POST' && url.pathname.startsWith('/api/testimonies/') && url.pathname.endsWith('/react')) {
+      await requireUser(req)
+      const id = url.pathname.split('/')[3]
+      const testimony = await findOne('testimonies', { id })
+      if (!testimony) return send(req, res, 404, { error: 'Testimony not found' })
+      const updated = await updateRecord('testimonies', { id }, {
+        reactionCount: Number(testimony.reactionCount || 0) + 1,
+        lastReactedAt: new Date().toISOString(),
+      })
+      return send(req, res, 200, { testimony: updated })
     }
 
     if (req.method === 'GET' && url.pathname === '/api/creator-links') {
@@ -344,6 +428,19 @@ const server = http.createServer(async (req, res) => {
       return send(req, res, 201, payment)
     }
 
+    if (req.method === 'GET' && url.pathname === '/api/giving/summary') {
+      const user = await optionalUser(req)
+      const query = user ? { userId: user.id } : {}
+      const donations = await listRecords('donations', query)
+      const subscriptions = await listRecords('subscriptions', query)
+      return send(req, res, 200, {
+        donations,
+        subscriptions,
+        totals: revenueSummary([...donations, ...subscriptions]),
+        providers: paymentReadiness(),
+      })
+    }
+
     if (req.method === 'POST' && url.pathname.startsWith('/api/webhooks/')) {
       const provider = normalizeProvider(url.pathname.split('/').pop())
       const body = await readJson(req)
@@ -362,12 +459,19 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req)
       const stream = await addRecord('streams', {
         hostId: user.id,
+        hostName: user.displayName,
         title: requiredText(body.title, 'Stream title'),
         startsAt: requiredText(body.startsAt, 'Start time'),
         provider: optionalText(body.provider) || 'mux',
         status: 'scheduled',
+        audience: optionalText(body.audience) || 'Scheduled',
+        accent: optionalText(body.accent) || '#c0392b',
       })
       return send(req, res, 201, { stream })
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/streams') {
+      return send(req, res, 200, { streams: await listRecordsWithSeed('streams', {}, seedStreams) })
     }
 
     return send(req, res, 404, { error: 'Route not found' })
@@ -542,6 +646,31 @@ function safeWebhookHeaders(headers) {
     'stripe-signature': headers['stripe-signature'] ? 'present' : '',
     'x-hubtel-signature': headers['x-hubtel-signature'] ? 'present' : '',
   }
+}
+
+function paymentReadiness() {
+  return {
+    hubtel: Boolean(process.env.HUBTEL_CLIENT_ID && process.env.HUBTEL_CLIENT_SECRET),
+    paystack: Boolean(process.env.PAYSTACK_SECRET_KEY),
+    stripe: Boolean(process.env.STRIPE_SECRET_KEY),
+    prototypeProviders: ['hubtel', 'paystack', 'stripe'],
+  }
+}
+
+function revenueSummary(records) {
+  return records.reduce((summary, record) => {
+    const amount = Number(record.amountCents || 0)
+    summary.count += 1
+    summary.amountCents += amount
+    summary.byProvider[record.provider] = (summary.byProvider[record.provider] || 0) + amount
+    return summary
+  }, { count: 0, amountCents: 0, byProvider: {} })
+}
+
+function normalizeHandle(value) {
+  const raw = optionalText(value).toLowerCase().replace(/[^a-z0-9_]+/g, '')
+  if (!raw) throw badRequest('Channel handle is required')
+  return `@${raw.replace(/^@+/, '')}`
 }
 
 function publicUser(user) {
